@@ -1,17 +1,21 @@
-# Utiliser Python slim
-FROM python:3.11-slim
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
 
-# Installer les dépendances
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+      - name: Build Docker image
+        run: docker build -t flask-preview .
 
-# Copier le code Flask
-COPY template ./template
-COPY templates ./templates
+      - name: Install ngrok
+        run: |
+          curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+          sudo apt update && sudo apt install ngrok -y
 
-# Exposer le port Flask
-EXPOSE 5000
-
-# Lancer Flask
-CMD ["python", "-m", "template"]
+      - name: Run Flask and Ngrok
+        run: |
+          docker run -d --name flask-server -p 5000:5000 flask-preview
+          ngrok http 5000 --log=stdout &
+          sleep 5
+          curl -s http://127.0.0.1:4040/api/tunnels | jq
